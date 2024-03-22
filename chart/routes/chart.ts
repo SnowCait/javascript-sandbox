@@ -1,10 +1,15 @@
 import { type Handlers } from "$fresh/server.ts";
-import { renderChart } from "$fresh_charts/mod.ts";
+import { chart } from "$fresh_charts/core.ts";
 import { ChartColors, transparentize } from "$fresh_charts/utils.ts";
+import * as svg2png from "svg2png";
+
+await svg2png.initialize(
+  await fetch("https://unpkg.com/svg2png-wasm/svg2png_wasm_bg.wasm"),
+);
 
 export const handler: Handlers = {
-  GET() {
-    return renderChart({
+  async GET() {
+    const svg = chart({
       type: "line",
       data: {
         labels: ["1", "2", "3"],
@@ -29,6 +34,12 @@ export const handler: Handlers = {
         devicePixelRatio: 1,
         scales: { y: { beginAtZero: true } },
       },
+    });
+
+    const png = await svg2png.svg2png(svg);
+
+    return new Response(png, {
+      headers: { "content-type": "image/png" },
     });
   },
 };
