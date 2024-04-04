@@ -23,25 +23,47 @@ export const handler: Handlers = {
     console.log("[chart]", params);
     const { pair, date } = params;
     const today = new Date(date);
-    const targetDate = new Date(today);
     if (!supportedPairs.includes(pair) || Number.isNaN(today.getTime())) {
       return renderNotFound();
     }
 
-    const data = new Map<Date, string>();
-    for (let i = 0; i < 31; i++) {
-      const time = targetDate.toISOString();
+    const dates = Array.from({ length: 31 }).map((_, i) => {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      return date;
+    });
 
-      targetDate.setDate(targetDate.getDate() - 1);
+    const chunkedEntries = await Promise.all(
+      chunk(dates, 10).map(async (chunkedDates) =>
+        await kv.getMany(
+          chunkedDates.map((date) => [pair, date.toISOString()]),
+        )
+      ),
+    );
+
+    console.log("[cache]", chunkedEntries);
+
+    const entries = chunkedEntries.flatMap((entries) =>
+      entries.filter(({ value }) => value !== null)
+    );
+
+    const data = new Map<string, string>(
+      entries.map((
+        { key, value },
+      ) => {
+        const [, time] = key as [string, string];
+        const { rate } = value as { rate: string };
+        return [time, rate];
+      }),
+    );
+    console.log("[cache data]", data);
+
+    for (let i = 0; i < dates.length; i++) {
+      const date = dates[i];
+      const time = date.toISOString();
 
       // From cache
-      const { value } = await kv.get([pair, time]);
-      if (value) {
-        const { rate } = value as { rate: string };
-        console.log("[cache]", pair, time, rate);
-
-        data.set(new Date(time), rate);
-
+      if (data.has(time)) {
         continue;
       }
 
@@ -57,7 +79,7 @@ export const handler: Handlers = {
         await kv.set([pair, time], { rate });
       }
 
-      data.set(new Date(today), rate);
+      data.set(time, rate);
 
       if (i % 5 === 4) {
         await delay(500);
@@ -67,9 +89,10 @@ export const handler: Handlers = {
     const svg = chart({
       type: "line",
       data: {
-        labels: [...data.keys()].reverse().map((date) =>
-          `${date.getMonth() + 1}/${date.getDate()}`
-        ),
+        labels: [...data.keys()].reverse().map((time) => {
+          const date = new Date(time);
+          return `${date.getMonth() + 1}/${date.getDate()}`;
+        }),
         datasets: [
           {
             label: `${pair} (${today.toLocaleDateString("ja")})`,
@@ -90,3 +113,10 @@ export const handler: Handlers = {
     });
   },
 };
+
+function chunk<T>(array: T[], size: number): T[][] {
+  return Array.from(
+    { length: Math.ceil(array.length / size) },
+    (_, i) => array.slice(i * size, i * size + size),
+  );
+}
