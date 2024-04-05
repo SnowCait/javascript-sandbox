@@ -24,6 +24,7 @@ export const handler: Handlers = {
     const { pair, date } = params;
     const today = new Date(date);
     if (!supportedPairs.includes(pair) || Number.isNaN(today.getTime())) {
+      console.error("[invalid params]", params);
       return renderNotFound();
     }
 
