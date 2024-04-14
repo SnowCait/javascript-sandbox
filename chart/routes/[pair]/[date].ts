@@ -4,6 +4,7 @@ import { type Handlers } from "$fresh/server.ts";
 import { chart } from "$fresh_charts/core.ts";
 import { ChartColors, transparentize } from "$fresh_charts/utils.ts";
 import { delay } from "$std/async/delay.ts";
+import sharp from "sharp";
 
 const kv = await Deno.openKv();
 
@@ -22,7 +23,7 @@ export const handler: Handlers = {
   async GET(_, { params, renderNotFound }) {
     console.log("[chart]", params);
     const { pair, date } = params;
-    const today = new Date(date);
+    const today = new Date(date.replace(/\.webp$/, ""));
     if (!supportedPairs.includes(pair) || Number.isNaN(today.getTime())) {
       console.error("[invalid params]", params);
       return renderNotFound();
@@ -109,8 +110,11 @@ export const handler: Handlers = {
       },
     });
 
-    return new Response(svg, {
-      headers: { "Content-Type": "image/svg+xml" },
+    const webp = await sharp(new TextEncoder().encode(svg)).flatten({
+      background: "#ffffff",
+    }).webp().toBuffer();
+    return new Response(webp, {
+      headers: { "Content-Type": "image/webp" },
     });
   },
 };
