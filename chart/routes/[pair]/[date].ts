@@ -8,7 +8,6 @@ import { delay } from "$std/async/delay.ts";
 import { render } from "resvg_wasm";
 
 const kv = await Deno.openKv();
-const cache = await caches.open("deno-fresh-charts");
 
 const supportedPairs = [
   "btc_jpy",
@@ -22,15 +21,8 @@ const supportedPairs = [
 ];
 
 export const handler: Handlers = {
-  async GET(request, { params, renderNotFound }) {
+  async GET(_, { params, renderNotFound }) {
     console.log("[chart]", params);
-
-    const cached = await cache.match(request);
-    if (cached) {
-      console.log("[cached]");
-      return cached;
-    }
-
     const { pair, date } = params;
     const today = new Date(date.replace(/\.(png|svg)$/, ""));
     if (!supportedPairs.includes(pair) || Number.isNaN(today.getTime())) {
@@ -52,7 +44,7 @@ export const handler: Handlers = {
       ),
     );
 
-    console.log("[kv]", chunkedEntries);
+    console.log("[cache]", chunkedEntries);
 
     const entries = chunkedEntries.flatMap((entries) =>
       entries.filter(({ value }) => value !== null)
@@ -67,13 +59,13 @@ export const handler: Handlers = {
         return [time, rate];
       }),
     );
-    console.log("[kv data]", data);
+    console.log("[cache data]", data);
 
     for (let i = 0; i < dates.length; i++) {
       const date = dates[i];
       const time = date.toISOString();
 
-      // From kv
+      // From cache
       if (data.has(time)) {
         continue;
       }
@@ -85,7 +77,7 @@ export const handler: Handlers = {
       const { rate } = await response.json();
       console.log("[api]", pair, time, rate);
 
-      // To kv
+      // To cache
       if (rate !== undefined) {
         await kv.set([pair, time], { rate });
       }
@@ -135,23 +127,20 @@ export const handler: Handlers = {
       }],
     });
 
-    let response: Response;
     if (date.endsWith(".svg")) {
-      response = new Response(svg, {
+      return new Response(svg, {
         headers: {
           "Content-Type": "image/svg+xml",
         },
       });
     } else {
       const png = await render(svg);
-      response = new Response(png, {
+      return new Response(png, {
         headers: {
           "Content-Type": "image/png",
         },
       });
     }
-    await cache.put(request, response.clone());
-    return response;
   },
 };
 
