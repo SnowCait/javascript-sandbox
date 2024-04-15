@@ -4,7 +4,7 @@ import { type Handlers } from "$fresh/server.ts";
 import { chart } from "$fresh_charts/core.ts";
 import { ChartColors, transparentize } from "$fresh_charts/utils.ts";
 import { delay } from "$std/async/delay.ts";
-import sharp from "sharp";
+// import sharp from "sharp";
 
 console.log("[version]", Deno.version);
 
@@ -118,12 +118,18 @@ export const handler: Handlers = {
       },
     });
 
-    const webp = await sharp(new TextEncoder().encode(svg)).flatten({
-      background: "#ffffff",
-    }).webp().toBuffer();
-    return new Response(webp, {
-      headers: { "Content-Type": "image/webp" },
+    return new Response(svg, {
+      headers: {
+        "Content-Type": "image/svg+xml",
+      },
     });
+
+    // const webp = await sharp(new TextEncoder().encode(svg)).flatten({
+    //   background: "#ffffff",
+    // }).webp().toBuffer();
+    // return new Response(webp, {
+    //   headers: { "Content-Type": "image/webp" },
+    // });
   },
 };
 
