@@ -106,7 +106,13 @@ export const handler: Handlers = {
         ],
       },
       options: {
-        devicePixelRatio: 1,
+        scales: {
+          x: {
+            ticks: {
+              maxRotation: 0,
+            },
+          },
+        },
       },
     });
 
