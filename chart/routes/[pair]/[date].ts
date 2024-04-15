@@ -6,6 +6,8 @@ import { ChartColors, transparentize } from "$fresh_charts/utils.ts";
 import { delay } from "$std/async/delay.ts";
 import sharp from "sharp";
 
+console.log("[version]", Deno.version);
+
 const kv = await Deno.openKv();
 
 const supportedPairs = [
