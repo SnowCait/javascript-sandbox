@@ -2,9 +2,10 @@
 
 import { type Handlers } from "$fresh/server.ts";
 import { chart } from "$fresh_charts/core.ts";
+import { ChartJs } from "$fresh_charts/deps.ts";
 import { ChartColors, transparentize } from "$fresh_charts/utils.ts";
 import { delay } from "$std/async/delay.ts";
-import sharp from "sharp";
+import { render } from "resvg_wasm";
 
 const kv = await Deno.openKv();
 
@@ -23,7 +24,7 @@ export const handler: Handlers = {
   async GET(_, { params, renderNotFound }) {
     console.log("[chart]", params);
     const { pair, date } = params;
-    const today = new Date(date.replace(/\.(webp|svg)$/, ""));
+    const today = new Date(date.replace(/\.(png|svg)$/, ""));
     if (!supportedPairs.includes(pair) || Number.isNaN(today.getTime())) {
       console.error("[invalid params]", params);
       return renderNotFound();
@@ -114,6 +115,16 @@ export const handler: Handlers = {
           },
         },
       },
+      plugins: [{
+        id: "backgroundColor",
+        beforeDraw: (chart: ChartJs.Chart) => {
+          const { ctx } = chart;
+          ctx.save();
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, chart.width, chart.height);
+          ctx.restore();
+        },
+      }],
     });
 
     if (date.endsWith(".svg")) {
@@ -123,11 +134,11 @@ export const handler: Handlers = {
         },
       });
     } else {
-      const webp = await sharp(new TextEncoder().encode(svg)).flatten({
-        background: "#ffffff",
-      }).webp().toBuffer();
-      return new Response(webp, {
-        headers: { "Content-Type": "image/webp" },
+      const png = await render(svg);
+      return new Response(png, {
+        headers: {
+          "Content-Type": "image/png",
+        },
       });
     }
   },
